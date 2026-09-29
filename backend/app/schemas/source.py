@@ -1,7 +1,7 @@
 """Source request/response schemas."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -50,6 +50,7 @@ class SourceResponse(BaseModel):
     source_url: Optional[str] = None
     file_path: Optional[str] = None
     language: Optional[str] = None
+    processor_metadata: Optional[dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
 

@@ -1,4 +1,4 @@
-# TRANSFORM-X backend — Phase 2 (Backend Foundation)
+# TRANSFORM-X backend — Phase 2 + 3A (Backend Foundation, Text & Document Processing)
 # Python 3.14 compatible. AI/OCR/video libraries intentionally excluded (later phases).
 
 fastapi==0.141.1
@@ -8,6 +8,12 @@ pydantic==2.12.5
 pydantic-settings==2.15.0
 psycopg[binary]==3.3.6
 alembic==1.20.0
+
+# Phase 3A: text & document processing (pure-Python; no OCR yet — Phase 4)
+python-multipart==0.0.32
+pypdf==6.19.0
+python-docx==1.2.0
+charset-normalizer==3.5.1
 
 # Testing
 pytest==8.4.2

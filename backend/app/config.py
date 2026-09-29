@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
 
+    # Phase 3A: document upload settings
+    upload_dir: str = "uploads"
+    max_upload_size_mb: int = 25
+    # Extensions accepted by the document upload endpoint.
+    allowed_document_extensions: str = "pdf,docx,txt"
+
     @property
     def cors_origin_list(self) -> list[str]:
         """CORS origins as a list (comma-separated in the environment)."""
@@ -31,6 +37,15 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.lower() == "production"
+
+    @property
+    def allowed_document_extension_list(self) -> list[str]:
+        """Allowed upload extensions as a lowercase list (comma-separated env)."""
+        return [ext.strip().lower().lstrip(".") for ext in self.allowed_document_extensions.split(",") if ext.strip()]
+
+    @property
+    def max_upload_size_bytes(self) -> int:
+        return self.max_upload_size_mb * 1024 * 1024
 
 
 @lru_cache

@@ -27,3 +27,24 @@ class ValidationError(AppError):
 
     status_code = 400
     error = "invalid_request"
+
+
+class PayloadTooLargeError(AppError):
+    """Upload exceeds the configured size limit (HTTP 413)."""
+
+    status_code = 413
+    error = "payload_too_large"
+
+
+class UnsupportedTypeError(AppError):
+    """Upload type/extension is outside the allowlist (HTTP 415)."""
+
+    status_code = 415
+    error = "unsupported_media_type"
+
+
+class UnprocessableContentError(AppError):
+    """Payload parsed but contains no usable content (HTTP 422)."""
+
+    status_code = 422
+    error = "unprocessable_content"

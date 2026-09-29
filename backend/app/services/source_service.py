@@ -1,12 +1,18 @@
 """Source service — business logic for operator sources."""
 
+from pathlib import Path
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.domain import SourceType
 from app.models import Source
+from app.processors.base import ExtractionError
+from app.processors.document_processor import DocumentProcessor, mime_type_for
+from app.processors.text import TextProcessor
 from app.schemas.source import SourceCreateText
-from app.utils.errors import NotFoundError
+from app.services.file_storage import FileStorageService
+from app.utils.errors import NotFoundError, ValidationError
 from app.utils.logging import get_logger
 
 logger = get_logger("sources")
@@ -40,6 +46,48 @@ class SourceService:
         source = self.db.get(Source, source_id)
         if source is None:
             raise NotFoundError(f"Source {source_id} not found")
+        return source
+
+    def create_document_source(self, payload: bytes, filename: str, title: str | None, language: str | None) -> Source:
+        """Process an uploaded document and persist it as a DOCUMENT source.
+
+        Pipeline: validate extension/size → extract text → save original →
+        persist source. Raises ValidationError (unsupported type/size),
+        ExtractionError (unparseable/no text) and maps them to HTTP errors
+        in the API layer.
+        """
+        storage = FileStorageService()
+        extension = storage.validate_extension(filename)
+        storage.validate_size(len(payload))
+
+        result = DocumentProcessor().process(payload, filename)
+        if not result.text_content:
+            raise ExtractionError("Document contains no extractable text")
+
+        file_path = storage.save(payload, filename)
+        metadata = dict(result.metadata)
+        if result.warnings:
+            metadata["warnings"] = result.warnings
+
+        source = Source(
+            source_type=SourceType.DOCUMENT,
+            title=title or Path(filename).stem or filename,
+            original_filename=filename,
+            mime_type=result.mime_type or mime_type_for(filename),
+            text_content=result.text_content,
+            file_path=file_path,
+            language=language,
+            processor_metadata=metadata,
+        )
+        self.db.add(source)
+        self.db.commit()
+        self.db.refresh(source)
+        logger.info(
+            "document_source_created id=%s file=%s words=%s",
+            source.id,
+            file_path,
+            metadata.get("word_count", "?"),
+        )
         return source
 
     def list(self, source_type: SourceType | None = None, limit: int = 50, offset: int = 0) -> tuple[list[Source], int]:

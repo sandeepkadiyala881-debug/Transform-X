@@ -1,10 +1,14 @@
-# TRANSFORM-X — Backend (Phase 2: Backend Foundation)
+# TRANSFORM-X — Backend (Phase 2 + 3A)
 
-FastAPI + PostgreSQL persistence foundation for the TRANSFORM-X AI-powered
-content transformation platform (SIH 2026 • PS 26154).
+FastAPI + PostgreSQL foundation plus **text & document processing** for the
+TRANSFORM-X AI-powered content transformation platform (SIH 2026 • PS 26154).
 
-**What this phase does:** receives and stores transformation sessions with
-their sources, generation configurations and output records.
+**Phase 2:** receives and stores transformation sessions with their sources,
+generation configurations and output records.
+
+**Phase 3A:** uploads PDF/DOCX/TXT documents, extracts their text (pypdf,
+python-docx, charset-normalizer), stores the original file under `uploads/`
+and persists extraction metadata on the source.
 
 ```
 Frontend  →  FastAPI REST API  →  PostgreSQL
@@ -42,8 +46,9 @@ pip install -r requirements.txt
 ```
 
 Installed packages: FastAPI, Uvicorn, SQLAlchemy 2.x, Pydantic,
-pydantic-settings, psycopg 3 (PostgreSQL driver), Alembic, pytest, httpx.
-Nothing else — no AI/OCR/video libraries yet.
+pydantic-settings, psycopg 3 (PostgreSQL driver), Alembic, plus Phase-3A
+document processing (python-multipart, pypdf, python-docx,
+charset-normalizer) and pytest/httpx. No OCR or AI libraries yet.
 
 ## PostgreSQL setup
 
@@ -70,6 +75,9 @@ cp .env.example .env
 | `API_V1_PREFIX`     | Default `/api/v1`                                |
 | `CORS_ORIGINS`      | Comma-separated origins, e.g. `http://localhost:5173` |
 | `LOG_LEVEL`         | `DEBUG` \| `INFO` \| `WARNING` \| `ERROR`        |
+| `UPLOAD_DIR`        | Where original uploads are stored (default `uploads`) |
+| `MAX_UPLOAD_SIZE_MB`| Upload size cap (default `25`)                   |
+| `ALLOWED_DOCUMENT_EXTENSIONS` | Upload allowlist (default `pdf,docx,txt`) |
 
 > Tip: percent-encode special characters in the password inside the URL
 > (e.g. `@` → `%40`).
@@ -102,6 +110,7 @@ uvicorn app.main:app --reload --port 8000
 | GET    | `/api/v1/health`                  | Service liveness                     |
 | GET    | `/api/v1/health/db`               | PostgreSQL connectivity              |
 | POST   | `/api/v1/sources/text`            | Create a text source                 |
+| POST   | `/api/v1/sources/documents`       | Upload PDF/DOCX/TXT, extract text, store file |
 | POST   | `/api/v1/sources/url`             | Register a URL source                |
 | GET    | `/api/v1/sources`                 | List sources (filter by type)        |
 | GET    | `/api/v1/sources/{id}`            | Retrieve one source                  |
@@ -115,8 +124,12 @@ uvicorn app.main:app --reload --port 8000
 
 Responses use a consistent envelope — single resources:
 `{"data": {...}, "message": "..."}`, lists: `{"data": [...], "total": n}`,
-errors: `{"error": "not_found", "message": "...", "details": ...}`.
+errors: `{"error": "...", "message": "...", "details": ...}`.
 Validation failures keep FastAPI's native 422 shape.
+
+Document upload error codes: **413** `payload_too_large`, **415**
+`unsupported_media_type`, **422** `unprocessable_content` (includes scanned
+PDFs with no extractable text — OCR arrives in Phase 4).
 
 ## Testing
 

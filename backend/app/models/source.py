@@ -1,9 +1,9 @@
 """Source model — information supplied by the operator."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import Enum as SAEnum
-from sqlalchemy import String, Text
+from sqlalchemy import JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
@@ -29,3 +29,7 @@ class Source(TimestampMixin, Base):
     source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
     file_path: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
     language: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    # Extraction details from Phase 3A processors: page/word counts, engine,
+    # warnings. Named processor_metadata because `metadata` is reserved by
+    # SQLAlchemy's Declarative API.
+    processor_metadata: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON, nullable=True)

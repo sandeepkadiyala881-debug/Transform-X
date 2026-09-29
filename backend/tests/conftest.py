@@ -25,8 +25,10 @@ def test_engine():
     settings = get_settings()
     url = settings.test_database_url or settings.database_url.replace("/transform_x", "/transform_x_test")
     engine = create_engine(url)
-    # Create the schema directly from metadata: tests are independent of
-    # migration state, while migrations remain the source of truth for prod.
+    # Sync the schema from metadata on every run: tests stay independent of
+    # migration state (fresh or partially migrated DBs both work), while
+    # migrations remain the source of truth for the dev/prod database.
+    Base.metadata.drop_all(engine)
     Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
