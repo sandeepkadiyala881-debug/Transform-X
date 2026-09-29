@@ -1,0 +1,13 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage
+
+# Environment secrets
+.env
+
+# Tooling
+.ruff_cache/
+.mypy_cache/
