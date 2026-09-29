@@ -1,0 +1,19 @@
+import { useSyncExternalStore } from 'react';
+
+/** Subscribe to a CSS media query from React. */
+export function useMediaQuery(query: string): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mql = window.matchMedia(query);
+      mql.addEventListener('change', onChange);
+      return () => mql.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(query).matches,
+    () => false,
+  );
+}
+
+/** True below the lg breakpoint — drives sidebar drawer mode. */
+export function useIsTabletOrBelow(): boolean {
+  return useMediaQuery('(max-width: 1023px)');
+}
