@@ -1,5 +1,6 @@
-# TRANSFORM-X backend — Phase 2 + 3A (Backend Foundation, Text & Document Processing)
-# Python 3.14 compatible. AI/OCR/video libraries intentionally excluded (later phases).
+# TRANSFORM-X backend — Phase 2 + 3A + 3B (Backend Foundation, Text & Document
+# Processing, Image + OCR)
+# Python 3.14 compatible. AI-content libraries intentionally excluded (later phases).
 
 fastapi==0.141.1
 uvicorn[standard]==0.54.0
@@ -14,6 +15,12 @@ python-multipart==0.0.32
 pypdf==6.19.0
 python-docx==1.2.0
 charset-normalizer==3.5.1
+
+# Phase 3B: image processing + OCR (RapidOCR ships its models in-wheel;
+# onnxruntime 1.30 provides cp314 wheels)
+rapidocr-onnxruntime==1.2.3
+pillow==12.3.0
+pypdfium2==5.13.0
 
 # Testing
 pytest==8.4.2

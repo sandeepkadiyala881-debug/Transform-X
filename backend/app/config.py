@@ -29,6 +29,13 @@ class Settings(BaseSettings):
     # Extensions accepted by the document upload endpoint.
     allowed_document_extensions: str = "pdf,docx,txt"
 
+    # Phase 3B: image upload + OCR settings
+    allowed_image_extensions: str = "png,jpg,jpeg,webp"
+    # Decompression-bomb guard: max pixels an image may decode to.
+    max_image_pixels: int = 40_000_000
+    # OCR language hint passed to the engine (RapidOCR model set).
+    ocr_language: str = "en"
+
     @property
     def cors_origin_list(self) -> list[str]:
         """CORS origins as a list (comma-separated in the environment)."""
@@ -42,6 +49,11 @@ class Settings(BaseSettings):
     def allowed_document_extension_list(self) -> list[str]:
         """Allowed upload extensions as a lowercase list (comma-separated env)."""
         return [ext.strip().lower().lstrip(".") for ext in self.allowed_document_extensions.split(",") if ext.strip()]
+
+    @property
+    def allowed_image_extension_list(self) -> list[str]:
+        """Allowed image extensions as a lowercase list (comma-separated env)."""
+        return [ext.strip().lower().lstrip(".") for ext in self.allowed_image_extensions.split(",") if ext.strip()]
 
     @property
     def max_upload_size_bytes(self) -> int:

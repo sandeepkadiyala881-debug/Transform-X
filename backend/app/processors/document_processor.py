@@ -73,9 +73,27 @@ class DocumentProcessor(SourceProcessor):
         warnings.extend(normalize_warnings)
 
         if not normalized:
-            raise ExtractionError(
-                "No extractable text found — the PDF may be scanned or image-based. "
-                "OCR support arrives in Phase 4."
+            # Phase 3B: scanned/image-only PDFs fall back to OCR instead of
+            # being rejected. Pages are rendered to bitmaps (pypdfium2) and
+            # passed through the same OCR engine as image uploads.
+            normalized, ocr_warnings, ocr_pages = self._ocr_scanned_pdf(payload, len(reader.pages))
+            warnings.extend(ocr_warnings)
+            if not normalized:
+                raise ExtractionError(
+                    "No extractable text found — the PDF may be scanned or "
+                    "image-based, and OCR recognised no text."
+                )
+
+            return ProcessorResult(
+                text_content=normalized,
+                mime_type=PDF_MIME,
+                metadata={
+                    "page_count": str(len(reader.pages)),
+                    "ocr_page_count": str(ocr_pages),
+                    "word_count": str(len(normalized.split())),
+                    "extraction_engine": "pypdfium2+rapidocr",
+                },
+                warnings=warnings,
             )
 
         return ProcessorResult(
@@ -88,6 +106,52 @@ class DocumentProcessor(SourceProcessor):
             },
             warnings=warnings,
         )
+
+    # ------------------------------------------------------- scanned PDF OCR
+    def _ocr_scanned_pdf(self, payload: bytes, page_count: int) -> tuple[str, list[str], int]:
+        """Render PDF pages to bitmaps and OCR them.
+
+        Returns (text, warnings, pages_ocr'd). Degrades to empty text when
+        pypdfium2 or the OCR engine is unavailable.
+        """
+        warnings: list[str] = []
+        try:
+            import pypdfium2 as pdfium
+        except ImportError:
+            warnings.append("PDF rendering unavailable for OCR")
+            return "", warnings, 0
+
+        from app.processors.ocr import get_ocr_engine
+        from app.processors.text import normalize_text as _normalize
+
+        try:
+            pdf = pdfium.PdfDocument(io.BytesIO(payload))
+        except Exception as exc:
+            raise ExtractionError("File is not a readable PDF document") from exc
+
+        parts: list[str] = []
+        pages_ocrd = 0
+        render_scale = 200 / 72  # 200 DPI
+        for index in range(len(pdf)):
+            try:
+                bitmap = pdf[index].render(scale=render_scale)
+                pil_image = bitmap.to_pil().convert("L")
+            except Exception:  # noqa: BLE001 — one bad page must not kill the upload
+                warnings.append(f"page {index + 1} could not be rendered for OCR")
+                continue
+
+            buffer = io.BytesIO()
+            pil_image.save(buffer, format="PNG")
+            lines = get_ocr_engine().recognize(buffer.getvalue())
+            if lines:
+                pages_ocrd += 1
+                parts.append("\n".join(line.text for line in lines))
+
+        text, normalize_warnings = _normalize("\n\n".join(parts))
+        warnings.extend(normalize_warnings)
+        if pages_ocrd:
+            warnings.append(f"{pages_ocrd} of {page_count} pages used OCR")
+        return text, warnings, pages_ocrd
 
     # ----------------------------------------------------------------- DOCX
     def _process_docx(self, payload: bytes) -> ProcessorResult:

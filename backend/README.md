@@ -1,7 +1,8 @@
-# TRANSFORM-X — Backend (Phase 2 + 3A)
+# TRANSFORM-X — Backend (Phase 2 + 3A + 3B)
 
-FastAPI + PostgreSQL foundation plus **text & document processing** for the
-TRANSFORM-X AI-powered content transformation platform (SIH 2026 • PS 26154).
+FastAPI + PostgreSQL foundation plus **text & document processing** and
+**image OCR** for the TRANSFORM-X AI-powered content transformation platform
+(SIH 2026 • PS 26154).
 
 **Phase 2:** receives and stores transformation sessions with their sources,
 generation configurations and output records.
@@ -9,6 +10,10 @@ generation configurations and output records.
 **Phase 3A:** uploads PDF/DOCX/TXT documents, extracts their text (pypdf,
 python-docx, charset-normalizer), stores the original file under `uploads/`
 and persists extraction metadata on the source.
+
+**Phase 3B:** uploads PNG/JPEG/WEBP images and runs OCR (RapidOCR on
+ONNX Runtime, models bundled in-wheel); scanned/image-only PDFs now fall
+back to OCR automatically instead of being rejected.
 
 ```
 Frontend  →  FastAPI REST API  →  PostgreSQL
@@ -46,9 +51,11 @@ pip install -r requirements.txt
 ```
 
 Installed packages: FastAPI, Uvicorn, SQLAlchemy 2.x, Pydantic,
-pydantic-settings, psycopg 3 (PostgreSQL driver), Alembic, plus Phase-3A
+pydantic-settings, psycopg 3 (PostgreSQL driver), Alembic, Phase-3A
 document processing (python-multipart, pypdf, python-docx,
-charset-normalizer) and pytest/httpx. No OCR or AI libraries yet.
+charset-normalizer), Phase-3B image OCR (rapidocr-onnxruntime, pillow,
+pypdfium2) and pytest/httpx. No external AI APIs or system binaries
+(Tesseract) required.
 
 ## PostgreSQL setup
 
@@ -78,6 +85,9 @@ cp .env.example .env
 | `UPLOAD_DIR`        | Where original uploads are stored (default `uploads`) |
 | `MAX_UPLOAD_SIZE_MB`| Upload size cap (default `25`)                   |
 | `ALLOWED_DOCUMENT_EXTENSIONS` | Upload allowlist (default `pdf,docx,txt`) |
+| `ALLOWED_IMAGE_EXTENSIONS` | Image allowlist (default `png,jpg,jpeg,webp`) |
+| `MAX_IMAGE_PIXELS` | Decompression-bomb guard (default `40000000`) |
+| `OCR_LANGUAGE` | OCR language hint (default `en`) |
 
 > Tip: percent-encode special characters in the password inside the URL
 > (e.g. `@` → `%40`).
@@ -111,6 +121,7 @@ uvicorn app.main:app --reload --port 8000
 | GET    | `/api/v1/health/db`               | PostgreSQL connectivity              |
 | POST   | `/api/v1/sources/text`            | Create a text source                 |
 | POST   | `/api/v1/sources/documents`       | Upload PDF/DOCX/TXT, extract text, store file |
+| POST   | `/api/v1/sources/images`          | Upload PNG/JPEG/WEBP, OCR text, store file |
 | POST   | `/api/v1/sources/url`             | Register a URL source                |
 | GET    | `/api/v1/sources`                 | List sources (filter by type)        |
 | GET    | `/api/v1/sources/{id}`            | Retrieve one source                  |
@@ -128,8 +139,12 @@ errors: `{"error": "...", "message": "...", "details": ...}`.
 Validation failures keep FastAPI's native 422 shape.
 
 Document upload error codes: **413** `payload_too_large`, **415**
-`unsupported_media_type`, **422** `unprocessable_content` (includes scanned
-PDFs with no extractable text — OCR arrives in Phase 4).
+`unsupported_media_type`, **422** `unprocessable_content`.
+
+Phase 3B behaviour: scanned/image-only PDFs are OCR'd automatically
+(`extraction_engine: pypdfium2+rapidocr`); a PDF where OCR still finds no
+text, or an image with no recognisable text, is rejected with 422.
+Image metadata includes `ocr_mean_confidence` and `ocr_line_count`.
 
 ## Testing
 
@@ -170,8 +185,9 @@ backend/
 
 ## Roadmap (later phases)
 
-- **Phase 3** — input processing: file uploads, PDF/DOCX/image/video/URL
-  processors behind `app/processors/`
+- **Phase 3** — input processing: file uploads, PDF/DOCX/image/URL
+  processors behind `app/processors/` (3A text & documents, 3B images + OCR
+  complete; video and URL scraping remain)
 - **Phase 4** — source intelligence: `app/ai/source_analyzer`
 - **Phase 5** — AI transformation engine producing real deliverables
 - **Later** — authentication, advanced analytics

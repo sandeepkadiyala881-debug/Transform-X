@@ -202,7 +202,9 @@ class TestScannedPdfPolicy:
         assert response.status_code == 422, response.text
         body = response.json()
         assert body["error"] == "unprocessable_content"
-        assert "Phase 4" in body["message"]
+        # Phase 3B: OCR runs on scanned pages; a truly blank PDF still yields
+        # no text and is rejected with the updated message.
+        assert "OCR recognised no text" in body["message"]
 
 
 class TestUploadLimits:

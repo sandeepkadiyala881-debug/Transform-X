@@ -9,6 +9,7 @@ from app.domain import SourceType
 from app.models import Source
 from app.processors.base import ExtractionError
 from app.processors.document_processor import DocumentProcessor, mime_type_for
+from app.processors.image_processor import ImageProcessor
 from app.processors.text import TextProcessor
 from app.schemas.source import SourceCreateText
 from app.services.file_storage import FileStorageService
@@ -84,6 +85,46 @@ class SourceService:
         self.db.refresh(source)
         logger.info(
             "document_source_created id=%s file=%s words=%s",
+            source.id,
+            file_path,
+            metadata.get("word_count", "?"),
+        )
+        return source
+
+    def create_image_source(self, payload: bytes, filename: str, title: str | None, language: str | None) -> Source:
+        """Process an uploaded image and persist it as an IMAGE source.
+
+        Pipeline mirrors create_document_source: validate extension/size →
+        OCR-extract text → save original → persist source.
+        """
+        storage = FileStorageService()
+        storage.validate_image_extension(filename)
+        storage.validate_size(len(payload))
+
+        result = ImageProcessor().process(payload, filename)
+        if not result.text_content:
+            raise ExtractionError("Image contains no recognisable text")
+
+        file_path = storage.save(payload, filename, kind="image")
+        metadata = dict(result.metadata)
+        if result.warnings:
+            metadata["warnings"] = result.warnings
+
+        source = Source(
+            source_type=SourceType.IMAGE,
+            title=title or Path(filename).stem or filename,
+            original_filename=filename,
+            mime_type=result.mime_type,
+            text_content=result.text_content,
+            file_path=file_path,
+            language=language,
+            processor_metadata=metadata,
+        )
+        self.db.add(source)
+        self.db.commit()
+        self.db.refresh(source)
+        logger.info(
+            "image_source_created id=%s file=%s words=%s",
             source.id,
             file_path,
             metadata.get("word_count", "?"),

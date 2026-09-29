@@ -64,6 +64,35 @@ def create_text_source(
 
 
 @router.post(
+    "/images",
+    response_model=Envelope[SourceResponse],
+    status_code=201,
+    summary="Upload an image source",
+    description=(
+        "Accepts a PNG, JPEG or WEBP image, runs OCR to extract visible text, "
+        "stores the original file and creates an IMAGE source. Images without "
+        "recognisable text are rejected."
+    ),
+)
+async def create_image_source(
+    file: UploadFile = File(..., description="Image file (PNG, JPEG or WEBP)"),
+    title: str | None = Form(None, description="Optional display title; derived from filename when omitted"),
+    language: str | None = Form(None, description="Optional language hint"),
+    db: Session = Depends(get_db),
+) -> Envelope[SourceResponse]:
+    payload = await file.read()
+    filename = Path(file.filename or "upload").name  # strip any client path
+    try:
+        source = SourceService(db).create_image_source(
+            payload=payload, filename=filename, title=title, language=language
+        )
+    except ExtractionError as exc:
+        # Unreadable image or no recognisable text — HTTP 422.
+        raise UnprocessableContentError(str(exc), details={"filename": filename}) from exc
+    return Envelope(data=SourceResponse.model_validate(source), message="Image source created successfully")
+
+
+@router.post(
     "/url",
     response_model=Envelope[SourceResponse],
     status_code=201,
