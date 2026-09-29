@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     # OCR language hint passed to the engine (RapidOCR model set).
     ocr_language: str = "en"
 
+    # Phase 3C: URL fetch settings
+    url_connect_timeout_seconds: float = 10.0
+    url_read_timeout_seconds: float = 20.0
+    url_total_timeout_seconds: float = 30.0
+    max_url_response_mb: int = 10
+    url_max_redirects: int = 5
+    url_allowed_schemes: str = "http,https"
+    # Minimum interval between fetches to the same host (rate limiting).
+    url_per_host_min_interval_ms: int = 1000
+
     @property
     def cors_origin_list(self) -> list[str]:
         """CORS origins as a list (comma-separated in the environment)."""
@@ -54,6 +64,11 @@ class Settings(BaseSettings):
     def allowed_image_extension_list(self) -> list[str]:
         """Allowed image extensions as a lowercase list (comma-separated env)."""
         return [ext.strip().lower().lstrip(".") for ext in self.allowed_image_extensions.split(",") if ext.strip()]
+
+    @property
+    def url_allowed_scheme_list(self) -> list[str]:
+        """Allowed URL schemes as a lowercase list (comma-separated env)."""
+        return [s.strip().lower() for s in self.url_allowed_schemes.split(",") if s.strip()]
 
     @property
     def max_upload_size_bytes(self) -> int:

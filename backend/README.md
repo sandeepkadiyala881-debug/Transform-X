@@ -1,8 +1,8 @@
-# TRANSFORM-X — Backend (Phase 2 + 3A + 3B)
+# TRANSFORM-X — Backend (Phase 2 + 3A + 3B + 3C)
 
-FastAPI + PostgreSQL foundation plus **text & document processing** and
-**image OCR** for the TRANSFORM-X AI-powered content transformation platform
-(SIH 2026 • PS 26154).
+FastAPI + PostgreSQL foundation plus **text & document processing**,
+**image OCR** and **URL processing** for the TRANSFORM-X AI-powered content
+transformation platform (SIH 2026 • PS 26154).
 
 **Phase 2:** receives and stores transformation sessions with their sources,
 generation configurations and output records.
@@ -14,6 +14,13 @@ and persists extraction metadata on the source.
 **Phase 3B:** uploads PNG/JPEG/WEBP images and runs OCR (RapidOCR on
 ONNX Runtime, models bundled in-wheel); scanned/image-only PDFs now fall
 back to OCR automatically instead of being rejected.
+
+**Phase 3C:** `POST /sources/url` now fetches the page (SSRF-protected:
+scheme/port allowlists, private/loopback/link-local IP blocking, DNS
+resolution pinning, per-redirect re-validation, streaming size caps,
+timeouts, per-host rate limiting), extracts title/description/article text
+via BeautifulSoup and stores the result with full fetch metadata.
+`fetch=false` preserves register-only behaviour.
 
 ```
 Frontend  →  FastAPI REST API  →  PostgreSQL
@@ -88,6 +95,11 @@ cp .env.example .env
 | `ALLOWED_IMAGE_EXTENSIONS` | Image allowlist (default `png,jpg,jpeg,webp`) |
 | `MAX_IMAGE_PIXELS` | Decompression-bomb guard (default `40000000`) |
 | `OCR_LANGUAGE` | OCR language hint (default `en`) |
+| `URL_*_TIMEOUT_SECONDS` | Fetch connect/read/total timeouts (10/20/30) |
+| `MAX_URL_RESPONSE_MB` | Max downloaded page size (default `10`) |
+| `URL_MAX_REDIRECTS` | Redirect ceiling (default `5`) |
+| `URL_ALLOWED_SCHEMES` | Scheme allowlist (default `http,https`) |
+| `URL_PER_HOST_MIN_INTERVAL_MS` | Per-host fetch rate limit (default `1000`) |
 
 > Tip: percent-encode special characters in the password inside the URL
 > (e.g. `@` → `%40`).
@@ -122,6 +134,7 @@ uvicorn app.main:app --reload --port 8000
 | POST   | `/api/v1/sources/text`            | Create a text source                 |
 | POST   | `/api/v1/sources/documents`       | Upload PDF/DOCX/TXT, extract text, store file |
 | POST   | `/api/v1/sources/images`          | Upload PNG/JPEG/WEBP, OCR text, store file |
+| POST   | `/api/v1/sources/url`             | Fetch URL (SSRF-guarded), extract article text; `fetch=false` registers only |
 | POST   | `/api/v1/sources/url`             | Register a URL source                |
 | GET    | `/api/v1/sources`                 | List sources (filter by type)        |
 | GET    | `/api/v1/sources/{id}`            | Retrieve one source                  |
@@ -185,9 +198,8 @@ backend/
 
 ## Roadmap (later phases)
 
-- **Phase 3** — input processing: file uploads, PDF/DOCX/image/URL
-  processors behind `app/processors/` (3A text & documents, 3B images + OCR
-  complete; video and URL scraping remain)
+- **Phase 3** — input processing: 3A text & documents, 3B images + OCR and
+  3C URL fetching are complete; video upload/processing remains
 - **Phase 4** — source intelligence: `app/ai/source_analyzer`
 - **Phase 5** — AI transformation engine producing real deliverables
 - **Later** — authentication, advanced analytics

@@ -23,6 +23,27 @@ class SourceCreateText(BaseModel):
         return v
 
 
+class UrlSourceCreate(BaseModel):
+    """Request body for POST /sources/url.
+
+    Phase 3C: ``fetch`` defaults to true — the URL is fetched, SSRF-checked
+    and its article text extracted. ``fetch=false`` preserves the Phase-2
+    register-only behaviour.
+    """
+
+    url: str = Field(..., min_length=1, max_length=2048)
+    title: Optional[str] = Field(None, min_length=1, max_length=255)
+    language: Optional[str] = Field(None, max_length=32)
+    fetch: bool = True
+
+    @field_validator("url")
+    @classmethod
+    def url_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("url must not be blank")
+        return v.strip()
+
+
 class SourceCreateFile(BaseModel):
     """Metadata payload for future file-based source creation (Phase 3).
 

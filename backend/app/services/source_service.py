@@ -11,8 +11,10 @@ from app.processors.base import ExtractionError
 from app.processors.document_processor import DocumentProcessor, mime_type_for
 from app.processors.image_processor import ImageProcessor
 from app.processors.text import TextProcessor
-from app.schemas.source import SourceCreateText
+from app.processors.url_processor import UrlProcessor
+from app.schemas.source import SourceCreateText, UrlSourceCreate
 from app.services.file_storage import FileStorageService
+from app.services.url_fetcher import UrlFetcher, robots_allows_fetch
 from app.utils.errors import NotFoundError, ValidationError
 from app.utils.logging import get_logger
 
@@ -87,6 +89,66 @@ class SourceService:
             "document_source_created id=%s file=%s words=%s",
             source.id,
             file_path,
+            metadata.get("word_count", "?"),
+        )
+        return source
+
+    def create_url_source(
+        self,
+        payload: UrlSourceCreate,
+        fetcher: UrlFetcher | None = None,
+    ) -> Source:
+        """Create a URL source: register-only, or fetch + extract (default).
+
+        ``fetch=False`` preserves the Phase-2 behaviour of registering the
+        URL without network access. With fetch enabled the URL is validated,
+        SSRF-checked, fetched with caps and its article text extracted.
+        """
+        if not payload.fetch:
+            source = Source(
+                source_type=SourceType.URL,
+                title=payload.title or payload.url[:255],
+                source_url=payload.url,
+                language=payload.language,
+            )
+            self.db.add(source)
+            self.db.commit()
+            self.db.refresh(source)
+            logger.info("url_source_registered id=%s", source.id)
+            return source
+
+        fetch_result = (fetcher or UrlFetcher()).fetch(payload.url)
+
+        # Advisory robots.txt check (warning-only in Phase 3C).
+        if robots_allows_fetch(payload.url) is False:
+            warning = "robots.txt disallows this path (advisory, not enforced)"
+        else:
+            warning = None
+
+        result = UrlProcessor().process(fetch_result)
+        if warning:
+            result.warnings.append(warning)
+
+        title = payload.title or result.metadata.get("html_title") or payload.url[:255]
+        metadata = dict(result.metadata)
+        if result.warnings:
+            metadata["warnings"] = result.warnings
+
+        source = Source(
+            source_type=SourceType.URL,
+            title=title[:255],
+            source_url=payload.url,
+            text_content=result.text_content,
+            language=payload.language,
+            processor_metadata=metadata,
+        )
+        self.db.add(source)
+        self.db.commit()
+        self.db.refresh(source)
+        logger.info(
+            "url_source_created id=%s url_len=%s words=%s",
+            source.id,
+            len(payload.url),
             metadata.get("word_count", "?"),
         )
         return source

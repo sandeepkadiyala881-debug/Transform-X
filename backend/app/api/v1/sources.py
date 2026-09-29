@@ -9,9 +9,14 @@ from app.db.session import get_db
 from app.domain import SourceType
 from app.processors.base import ExtractionError
 from app.schemas.common import Envelope, EnvelopeList
-from app.schemas.source import SourceCreateText, SourceResponse
+from app.schemas.source import SourceCreateText, SourceResponse, UrlSourceCreate
 from app.services.source_service import SourceService
-from app.utils.errors import UnprocessableContentError, ValidationError
+from app.utils.errors import (
+    RateLimitedError,
+    UnprocessableContentError,
+    UrlFetchError,
+    ValidationError,
+)
 from app.utils.logging import get_logger
 
 logger = get_logger("api.sources")
@@ -97,14 +102,28 @@ async def create_image_source(
     response_model=Envelope[SourceResponse],
     status_code=201,
     summary="Create a URL source",
-    description="Registers an article/webpage URL for future processing.",
+    description=(
+        "Fetches an article/webpage URL, validates it against SSRF protections, "
+        "extracts the readable text and creates a URL source. Set fetch=false "
+        "to register the URL without fetching."
+    ),
 )
 def create_url_source(
-    payload: SourceCreateText,
+    payload: UrlSourceCreate,
     db: Session = Depends(get_db),
 ) -> Envelope[SourceResponse]:
-    source = SourceService(db).create_text_source(payload, SourceType.URL)
-    return Envelope(data=SourceResponse.model_validate(source), message="URL source registered successfully")
+    try:
+        source = SourceService(db).create_url_source(payload)
+    except ExtractionError as exc:
+        raise UnprocessableContentError(str(exc), details={"url": payload.url[:512]}) from exc
+    except (UrlFetchError, RateLimitedError):
+        raise
+    message = (
+        "URL source registered successfully"
+        if not payload.fetch
+        else "URL source created successfully"
+    )
+    return Envelope(data=SourceResponse.model_validate(source), message=message)
 
 
 @router.get(

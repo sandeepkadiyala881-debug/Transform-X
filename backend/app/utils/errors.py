@@ -48,3 +48,17 @@ class UnprocessableContentError(AppError):
 
     status_code = 422
     error = "unprocessable_content"
+
+
+class UrlFetchError(AppError):
+    """Upstream URL could not be fetched (HTTP 502)."""
+
+    status_code = 502
+    error = "url_fetch_failed"
+
+
+class RateLimitedError(AppError):
+    """Per-host fetch rate limit exceeded (HTTP 429)."""
+
+    status_code = 429
+    error = "rate_limited"

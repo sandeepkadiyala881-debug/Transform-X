@@ -1,5 +1,5 @@
-# TRANSFORM-X backend — Phase 2 + 3A + 3B (Backend Foundation, Text & Document
-# Processing, Image + OCR)
+# TRANSFORM-X backend — Phase 2 + 3A + 3B + 3C (Backend Foundation, Text &
+# Document Processing, Image + OCR, URL Processing)
 # Python 3.14 compatible. AI-content libraries intentionally excluded (later phases).
 
 fastapi==0.141.1
@@ -21,6 +21,11 @@ charset-normalizer==3.5.1
 rapidocr-onnxruntime==1.2.3
 pillow==12.3.0
 pypdfium2==5.13.0
+
+# Phase 3C: URL fetching + HTML extraction (httpx already required by tests)
+httpx==0.28.1
+beautifulsoup4==4.15.0
+soupsieve==2.10
 
 # Testing
 pytest==8.4.2
